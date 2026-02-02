@@ -1,0 +1,145 @@
+CREATE TABLE Customer (
+    cust_no INT PRIMARY KEY,
+    cname VARCHAR(255),
+    city VARCHAR(255)
+);
+
+CREATE TABLE Orders (
+    order_no INT PRIMARY KEY,
+    odate DATE,
+    cust_no INT,
+    order_amt INT,
+    FOREIGN KEY (cust_no) REFERENCES Customer(cust_no) ON DELETE CASCADE
+);
+
+CREATE TABLE Item (
+    item INT PRIMARY KEY,
+    unitprice INT
+);
+
+CREATE TABLE Order_item (
+    order_no INT,
+    Item INT,
+    qty INT,
+    PRIMARY KEY (order_no, Item),
+    FOREIGN KEY (order_no) REFERENCES Orders(order_no) ON DELETE CASCADE,
+    FOREIGN KEY (Item) REFERENCES Item(item) ON DELETE CASCADE
+);
+
+CREATE TABLE Warehouse (
+    warehouse_no INT PRIMARY KEY,
+    city VARCHAR(255)
+);
+
+CREATE TABLE Shipment (
+    order_no INT PRIMARY KEY,
+    warehouse_no INT,
+    ship_date DATE,
+    FOREIGN KEY (order_no) REFERENCES Orders(order_no) ON DELETE CASCADE,
+    FOREIGN KEY (warehouse_no) REFERENCES Warehouse(warehouse_no) ON DELETE CASCADE
+);
+
+INSERT INTO Customer VALUES
+(1, 'vinay', 'New York'),
+(2, 'manoj', 'Los Angeles'),
+(3, 'kumar', 'Chicago'),
+(4, 'shivu', 'Houston'),
+(5, 'dhanush', 'San Francisco');
+
+INSERT INTO Orders VALUES
+(101, '2026-01-15', 1, 500),
+(102, '2026-02-02', 2, 750),
+(103, '2026-03-10', 3, 300),
+(104, '2026-04-05', 4, 900),
+(105, '2026-05-12', 5, 600);
+
+INSERT INTO Item VALUES
+(1, 50),
+(2, 30),
+(3, 25),
+(4, 15),
+(5, 40);
+
+INSERT INTO Order_item VALUES
+(101, 1, 2),
+(101, 2, 3),
+(102, 3, 1),
+(103, 4, 5),
+(104, 5, 2);
+
+INSERT INTO Warehouse VALUES
+(1, 'C1'),
+(2, 'C2'),
+(3, 'C3'),
+(4, 'C4'),
+(5, 'C5');
+
+INSERT INTO Shipment VALUES
+(101, 1, '2026-01-20'),
+(102, 2, '2026-02-25'),
+(103, 3, '2026-03-15'),
+(104, 4, '2026-04-10'),
+(105, 5, '2026-05-17');
+
+SELECT o.order_no, s.ship_date
+FROM Orders o
+JOIN Shipment s ON o.order_no = s.order_no
+WHERE s.warehouse_no = 2;
+
+SELECT o.order_no, w.city
+FROM Customer c
+JOIN Orders o ON c.cust_no = o.cust_no
+JOIN Shipment s ON o.order_no = s.order_no
+JOIN Warehouse w ON s.warehouse_no = w.warehouse_no
+WHERE c.cname = 'kumar';
+
+SELECT c.cname, COUNT(o.order_no) AS no_of_orders, AVG(o.order_amt) AS avg_order_amt
+FROM Customer c
+LEFT JOIN Orders o ON c.cust_no = o.cust_no
+GROUP BY c.cname;
+
+DELETE FROM Orders
+WHERE cust_no = (SELECT cust_no
+                 FROM Customer
+                 WHERE cname = 'kumar');
+
+SELECT item, MAX(unitprice)
+FROM Item;
+
+DELIMITER //
+
+CREATE trigger UpdateOrderAmt
+after insert on Order_item
+for each row
+BEGIN
+    update Orders set order_amt = (new.qty*(select distinct unitprice
+                                           from Item
+                                           NATURAL JOIN Order_item
+                                           where item = new.item))
+    where Orders.order_no = new.order_no;
+END;//
+
+DELIMITER ;
+
+to check the delimiter
+SELECT order_no, order_amt
+FROM Orders
+WHERE order_no = 101;
+
+INSERT INTO Order_item VALUES
+ (101, 3, 4);
+
+SELECT order_no, order_amt
+FROM Orders
+WHERE order_no = 101;
+
+
+
+CREATE VIEW Orders_Warehouse_5 AS
+SELECT o.order_no, s.ship_date
+FROM Orders o
+JOIN Shipment s ON o.order_no = s.order_no
+WHERE s.warehouse_no = 5;
+
+SELECT * FROM Orders_Warehouse_5;
+
