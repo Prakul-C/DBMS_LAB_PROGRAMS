@@ -1,0 +1,128 @@
+ create table department (
+     dno int primary key,
+     dname varchar(25),
+     mgrssn int,
+     mgrstartdate date );
+
+create table employee (
+     ssn int primary key,
+     name varchar(25),
+     address varchar(255),
+     sex char(1),
+     salary float,
+     superssn int,
+     dno int,
+     foreign key (dno) references department(dno) on delete cascade);
+
+create table dlocation (
+dno int primary key,
+dloc varchar(255),
+foreign key (dno) references department (dno) on delete cascade);
+
+create table project (
+pno int primary key,
+pname varchar(255),
+plocation varchar(255),
+dno int,
+foreign key(dno) references department(dno) on delete cascade);
+
+create table works_on (
+ssn int,
+pno int,
+hours int,
+primary key (ssn,pno),
+foreign key (ssn) references employee(ssn) on delete cascade,
+foreign key (pno) references project(pno) on delete cascade );
+
+
+insert into department values
+(1,'hr',1,'2026-01-01'),
+(2,'it',2,'2026-02-01'),
+(3,'finance',4,'2026-03-01'),
+(4,'accounts',3,'2026-09-07'),
+(5,'production',5,'2026-07-07');
+
+insert into employee values
+(1,'manoj','123 main st','m',500000,3,1),
+(2,'pramod','456 oak st','m',600008,1,4),
+(3,'shivu','789 pine st','m',550090,2,4),
+(4,'vinay','101 elm st','m',700009,4,3),
+(5,'dhanush','202 malpe st','m',800700,2,1);
+
+insert into dlocation values 
+(1,'new york'),
+(2,'san francisco'),
+(3,'chicago'),
+(4,'alaska'),
+(5,'california');
+
+insert into project values 
+(101,'iot','new york',2),
+(102,'system testing','san francisco',5),
+(103,'product optimisation','chicago',3),
+(104,'yeild increase','california',1),
+(105,'product refinement','alaska',4);
+
+insert into works_on values 
+(1,101,40),
+(2,102,30),
+(3,101,20),
+(4,103,25),
+(5,102,35);
+
+select distinct p.pno 
+from project p
+join works_on w on p.pno = w.pno
+join employee e on w.ssn =  e.ssn
+where e.name like '%ush';
+
+update employee 
+set salary = salary * 1.10
+where ssn in (select ssn from works_on where pno = (select pno from project where pname = 'iot'));
+select * from employee;
+
+select 
+sum(salary) as totalsalary,
+max(salary) as maxsalary,
+min(salary) as minsalary,
+avg(salary) as averagesalary
+from employee
+where dno = (select dno from department where dname = 'accounts');
+
+select employee.ssn,name,dno 
+from employee 
+where not exists
+(select pno from project p where p.dno = 5
+and pno not in (select pno from works_on w where w.ssn = employee.ssn));
+
+select dno,count(*) as numemployees
+from employee
+where salary > 600000
+group by dno
+having count(*) > 5;
+
+create view employeedetails as
+select e.name,d.dname as deptname,dl.dloc as deptlocation
+from employee e
+join department d on e.dno = d.dno
+join dlocation dl on dl.dno = d.dno;
+select * from employeedetails;
+
+delimiter //
+create trigger preventprojectdeletion
+before delete on project
+for each row
+begin
+declare projectcount int;
+select count(*)
+into projectcount
+from works_on
+where pno= old.pno;
+if projectcount > 0 then
+signal sqlstate '45000'
+set message_text = 'cannot delete project currently being worked on.';
+end if;
+end//
+delimiter;
+ delete from project where pno = 101;
+
