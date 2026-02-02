@@ -1,0 +1,125 @@
+CREATE TABLE STUDENT (
+    regno VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255),
+    major VARCHAR(255),
+    bdate DATE
+);
+
+CREATE TABLE COURSE (
+    course_no INT PRIMARY KEY,
+    cname VARCHAR(255),
+    dept VARCHAR(255)
+);
+
+CREATE TABLE ENROLL (
+    regno VARCHAR(50),
+    course_no INT,
+    sem INT,
+    marks INT,
+    FOREIGN KEY (regno) REFERENCES STUDENT(regno) ON DELETE CASCADE,
+    FOREIGN KEY (course_no) REFERENCES COURSE(course_no) ON DELETE CASCADE
+);
+
+CREATE TABLE TEXTBOOK (
+    book_ISBN INT PRIMARY KEY,
+    book_title VARCHAR(255),
+    publisher VARCHAR(255),
+    author VARCHAR(255)
+);
+
+CREATE TABLE BOOK_ADOPTION (
+    course_no INT,
+    sem INT,
+    book_ISBN INT,
+    FOREIGN KEY (course_no) REFERENCES COURSE(course_no) ON DELETE CASCADE,
+    FOREIGN KEY (book_ISBN) REFERENCES TEXTBOOK(book_ISBN) ON DELETE CASCADE
+);
+
+INSERT INTO STUDENT VALUES
+('S001', 'vinay', 'Computer Science', '2026-01-01'),
+('S002', 'manoj', 'Electrical Engineering', '2026-05-15'),
+('S003', 'pramod', 'Mechanical Engineering', '2026-08-20'),
+('S004', 'shivu', 'Computer Science', '2026-03-10'),
+('S005', 'dhanush', 'Physics', '2026-11-25');
+
+INSERT INTO COURSE VALUES
+(1, 'Database Management Systems', 'CS'),
+(2, 'Computer Networks', 'CS'),
+(3, 'Introduction to Physics', 'Physics'),
+(4, 'Mechanics of Materials', 'Mechanical Engineering'),
+(5, 'Digital Signal Processing', 'Electrical Engineering');
+
+INSERT INTO ENROLL VALUES
+('S001', 1, 1, 85),
+('S002', 1, 1, 72),
+('S003', 2, 1, 68),
+('S004', 1, 1, 90),
+('S005', 3, 1, 75);
+
+INSERT INTO TEXTBOOK VALUES
+(123456789, 'Database Management Systems', 'Pearson', 'Author1'),
+(234567890, 'Computer Networks', 'McGraw Hill', 'Author2'),
+(345678901, 'Introduction to Physics', 'Wiley', 'Author3'),
+(456789012, 'Mechanics of Materials', 'Springer', 'Author4'),
+(567890123, 'Digital Signal Processing', 'Pearson', 'Author5');
+
+INSERT INTO BOOK_ADOPTION VALUES
+(1, 1, 123456789),
+(1, 2, 234567890),
+(3, 2, 345678901),
+(4, 4, 456789012),
+(5, 3, 234567890);
+
+INSERT INTO TEXTBOOK VALUES
+(123456787, 'XYZ', 'ABC', 'PQRST');
+
+INSERT INTO BOOK_ADOPTION VALUES
+(1, 1, 123456787);
+
+select c.course_no, t.book_ISBN, t.book_title
+from course c
+join book_adoption b on b.course_no = c.course_no
+join textbook t on t.book_ISBN = b.book_ISBN
+where c.dept = "CS"
+and 2 < (select count(book_ISBN)
+         from book_adoption ba
+         where c.course_no = ba.course_no)
+order by t.book_title asc;
+
+SELECT C.dept
+FROM COURSE C
+WHERE NOT EXISTS (
+    SELECT BA.course_no
+    FROM BOOK_ADOPTION BA
+    JOIN TEXTBOOK TB ON BA.book_ISBN = TB.book_ISBN
+    WHERE BA.course_no = C.course_no AND TB.publisher != 'Wiley'
+);
+
+select s.*
+from student s
+join enroll e on s.regno = e.regno
+join course c on c.course_no = e.course_no
+where c.cname = "Database Management Systems"
+and e.marks in (select max(marks) from enroll);
+
+create view StudentCourses as
+select c.cname, s.name, e.marks
+from student s
+join enroll e on s.regno = e.regno
+join course c on c.course_no = e.course_no;
+
+DELIMITER //
+
+CREATE TRIGGER BeforeEnroll
+BEFORE INSERT ON ENROLL
+FOR EACH ROW
+BEGIN
+    IF NEW.marks < 40 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Marks prerequisite not met';
+    END IF;
+END//
+
+DELIMITER ;
+INSERT INTO ENROLL VALUES
+ ('S001', 1, 1, 35);
