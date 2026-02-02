@@ -1,0 +1,134 @@
+Create database SAILORS;
+
+Use SAILORS;
+
+create table sailors(
+    sid int not null,
+    primary key(sid),
+    sname varchar(25),
+    rating int not null,
+    age int not null
+);
+
+create table boat(
+    bid int not null,
+    primary key(bid),
+    bname varchar(30),
+    color varchar(15)
+);
+
+create table rservers(
+    sid int not null,
+    bid int not null,
+    foreign key(sid) references sailors(sid) on delete cascade,
+    foreign key(bid) references boat(bid) on delete cascade,
+    date date
+);
+
+insert into sailors values
+(1,"pramod",9,65),
+(2,"manoj",8,57),
+(3,"vinaystorm",6,45),
+(4,"shivu",8,41),
+(5,"kingstorm",9,47),
+(6,"dhanush",8,43);
+
+insert into boat values
+(101,"b101","blue"),
+(102,"b102","red"),
+(103,"b103","yellow"),
+(104,"b104","orange"),
+(105,"b105","green");
+
+insert into rservers values
+(1,101,"2026-01-01"),
+(1,102,"2026-06-09"),
+(1,103,"2026-01-01"),
+(1,104,"2026-01-01"),
+(1,105,"2026-03-23"),
+(2,101,"2026-01-01"),
+(2,104,"2026-09-08"),
+(1,102,"2026-01-01"),
+(6,101,"2026-01-01"),
+(4,105,"2026-09-08"),
+(4,101,"2026-01-01"),
+(5,101,"2026-01-09");
+
+select * from sailors;
+select * from boat;
+select * from rservers;
+
+select b.color
+from boat as b, sailors as s, rservers as r
+where s.sid = r.sid and b.bid = r.bid and s.sname = "manoj";
+
+(SELECT DISTINCT s.sid
+ FROM sailors s
+ JOIN rservers r ON s.sid = r.sid
+ WHERE s.rating >= 8)
+UNION
+(SELECT DISTINCT s.sid
+ FROM sailors s
+ JOIN rservers r ON s.sid = r.sid
+ JOIN boat b ON b.bid = r.bid
+ WHERE r.bid = 103);
+
+SELECT DISTINCT s.sname
+FROM sailors s
+LEFT JOIN rservers r ON s.sid = r.sid
+WHERE r.sid IS NULL AND s.sname LIKE "%storm%"
+ORDER BY s.sname ASC;
+
+SELECT s.sname
+FROM sailors s
+WHERE NOT EXISTS (
+    SELECT b
+    FROM boat b
+    WHERE NOT EXISTS (
+        SELECT r
+        FROM rservers r
+        WHERE r.sid = s.sid AND r.bid = b.bid
+    )
+);
+
+SELECT s.sname, MAX(s.age)
+FROM sailors s;
+
+SELECT r.bid, AVG(s.age) AS avg_age
+FROM rservers r
+JOIN sailors s ON r.sid = s.sid
+WHERE r.bid IN (
+    SELECT r2.bid
+    FROM rservers r2
+    JOIN sailors s2 ON r2.sid = s2.sid
+    WHERE s2.age >= 40
+    GROUP BY r2.bid
+    HAVING COUNT(DISTINCT r2.sid) >= 5
+)
+GROUP BY r.bid;
+
+CREATE VIEW ReservedBoats AS
+SELECT b.bname, b.color, s.rating
+FROM boat b
+JOIN rservers r ON b.bid = r.bid
+JOIN sailors s ON r.sid = s.sid;
+
+DELIMITER //
+
+CREATE TRIGGER prevent_delete
+BEFORE DELETE ON boat
+FOR EACH ROW
+BEGIN
+    DECLARE reservation_count INT;
+
+    SELECT COUNT(*) INTO reservation_count
+    FROM rservers
+    WHERE bid = OLD.bid;
+
+    IF reservation_count > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Cannot delete. Active reservations exist.';
+    END IF;
+END//
+DELIMITER ;
+
