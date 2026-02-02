@@ -1,0 +1,146 @@
+create table PERSON(
+    driver_id varchar(10),
+    name varchar(25),
+    address varchar(50),
+    primary key(driver_id)
+);
+
+create table CAR(
+    regno varchar(10),
+    primary key(regno),
+    model varchar(10),
+    year int
+);
+
+create table ACCIDENT(
+    report_number int not null,
+    primary key(report_number),
+    acc_date date,
+    location varchar(50)
+);
+
+create table OWNS(
+    driver_id varchar(10),
+    foreign key(driver_id) references PERSON(driver_id) on delete cascade,
+    regno varchar(10),
+    foreign key(regno) references CAR(regno) on delete cascade
+);
+
+create table PARTICIPATED(
+    driver_id varchar(10),
+    foreign key(driver_id) references PERSON(driver_id) on delete cascade,
+    regno varchar(10),
+    foreign key(regno) references CAR(regno) on delete cascade,
+    report_number int not null,
+    foreign key(report_number) references ACCIDENT(report_number) on delete cascade,
+    damage_amt int not null
+);
+
+insert into PERSON values
+("d1","vinay","vijayanagar"),
+("d2","manoj","jp nagar"),
+("d3","dhanush","kuvempunagar"),
+("d4","shivu","javalakshmipuram"),
+("d5","pramod","lakshmipuram");
+
+insert into CAR values
+("KA09MA1234","swift",2000),
+("KA09SF5634","mazda",2015),
+("KA09HA7239","toyota",2009),
+("KA09RG4367","mazda",2019),
+("KA09RK1889","honda",2021);
+
+insert into ACCIDENT values
+(12,"2026-09-09","vijayanagar"),
+(14,"2026-09-03","brigade rd"),
+(32,"2026-09-06","kuvempunagar"),
+(23,"2026-11-09","lakshmipuram"),
+(65,"2026-09-25","javalakshmipuram");
+
+insert into OWNS values
+("d1","KA09SF5634"),
+("d2","KA09RG4367"),
+("d3","KA09MA1234"),
+("d4","KA09RK1889"),
+("d5","KA09HA7239");
+
+insert into PARTICIPATED values
+("d2","KA09RG4367",12,25000),
+("d2","KA09RG4367",14,67000),
+("d3","KA09MA1234",32,12000),
+("d4","KA09RK1889",23,20000),
+("d5","KA09HA7239",65,34000);
+
+SELECT COUNT(DISTINCT P.driver_id) AS total_people_involved
+FROM PERSON P
+JOIN OWNS O ON P.driver_id = O.driver_id
+JOIN PARTICIPATED PA ON O.regno = PA.regno
+JOIN ACCIDENT A ON PA.report_number = A.report_number
+WHERE YEAR(A.acc_date) = 2021;
+
+SELECT COUNT(*) AS accidents_involving_manoj
+FROM PERSON P
+JOIN OWNS O ON P.driver_id = O.driver_id
+JOIN PARTICIPATED PA ON O.regno = PA.regno
+WHERE P.name = 'manoj';
+
+INSERT INTO ACCIDENT VALUES
+(78,"2022-01-01","ABC rd");
+
+SELECT * FROM ACCIDENT;
+
+DELETE FROM OWNS
+WHERE driver_id = (SELECT driver_id
+                   FROM PERSON
+                   WHERE name = 'smith')
+AND
+regno IN (SELECT regno
+          FROM CAR
+          WHERE model = 'Mazda');
+
+SELECT * FROM OWNS;
+
+UPDATE PARTICIPATED
+SET damage_amt = 170000
+WHERE regno = "KA09MA1234";
+
+SELECT * FROM PARTICIPATED;
+
+CREATE VIEW AccidentView AS
+SELECT DISTINCT C.model, C.year
+FROM CAR C
+JOIN PARTICIPATED PA ON C.regno = PA.regno;
+
+SELECT * FROM AccidentView;
+
+DELIMITER //
+CREATE TRIGGER PreventExcessiveAccidents
+BEFORE INSERT ON PARTICIPATED
+FOR EACH ROW
+BEGIN
+    DECLARE accident_count INT;
+
+    SELECT COUNT(*)
+    INTO accident_count
+    FROM PARTICIPATED
+    WHERE driver_id# = NEW.driver_id#
+    AND YEAR((SELECT acc_date
+              FROM ACCIDENT
+              WHERE report_number = NEW.report_number)) = YEAR(NOW());
+
+    IF accident_count >= 3 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Driver cannot participate in more than 3 accidents in a year';
+    END IF;
+END//
+
+DELIMITER ;
+
+INSERT INTO PARTICIPATED VALUES
+('d2','KA09RG4367',12,10000);
+
+INSERT INTO PARTICIPATED VALUES
+('d2','KA09RG4367',14,12000);
+
+INSERT INTO PARTICIPATED VALUES
+('d2','KA09RG4367',12,15000);
